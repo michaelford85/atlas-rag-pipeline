@@ -1,0 +1,32 @@
+# Ignore Python cache and virtualenvs
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+venv/
+.env
+.env.*
+!.env.vault
+
+# Ignore Git and editor metadata
+.git
+.gitignore
+.vscode
+.idea
+.DS_Store
+
+# Ignore temporary and build files
+*.log
+*.tmp
+*.swp
+*.bak
+*.tar
+*.gz
+*.zip
+
+# Ignore local artifacts
+*.pem
+*.key
+*.crt
