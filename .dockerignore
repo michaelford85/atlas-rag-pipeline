@@ -1,4 +1,10 @@
-# Ignore Python cache and virtualenvs
+# --- Keep .env.vault (encrypted) but ignore all other env files ---
+!.env.vault
+.env
+.env.*
+!.env.vault
+
+# --- Python cache and build artifacts ---
 __pycache__/
 *.pyc
 *.pyo
@@ -6,18 +12,17 @@ __pycache__/
 *.db
 *.sqlite3
 venv/
-.env
-.env.*
-!.env.vault
+build/
+dist/
 
-# Ignore Git and editor metadata
+# --- Git and IDE junk ---
 .git
 .gitignore
 .vscode
 .idea
 .DS_Store
 
-# Ignore temporary and build files
+# --- Logs and temp files ---
 *.log
 *.tmp
 *.swp
@@ -25,8 +30,3 @@ venv/
 *.tar
 *.gz
 *.zip
-
-# Ignore local artifacts
-*.pem
-*.key
-*.crt
