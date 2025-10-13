@@ -1,32 +1,18 @@
-# --- Keep .env.vault (encrypted) but ignore all other env files ---
-!.env.vault
-.env
-.env.*
+# Ignore all environment files
+.env*
+# EXCEPT the vault file
 !.env.vault
 
-# --- Python cache and build artifacts ---
+# Usual housekeeping
+.git
+.gitignore
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 *.db
 *.sqlite3
-venv/
-build/
-dist/
-
-# --- Git and IDE junk ---
-.git
-.gitignore
-.vscode
-.idea
-.DS_Store
-
-# --- Logs and temp files ---
 *.log
-*.tmp
-*.swp
-*.bak
-*.tar
-*.gz
-*.zip
+.vscode/
+.idea/
+.DS_Store
