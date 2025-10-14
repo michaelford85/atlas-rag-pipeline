@@ -197,3 +197,40 @@ docker run -e ANSIBLE_HOST -e ANSIBLE_USER -e ANSIBLE_KEY_FILE -it atlas-rag-pip
 ```
 
 ---
+---
+
+## 🧠 Setting Up Ollama on AlmaLinux EC2
+
+Follow these steps to provision and configure an Ollama server from within the Docker container.
+
+### 1️⃣ Start the container
+
+Run the following command, replacing values as needed:
+
+```bash
+docker run -it \\
+  -e DOTENV_KEY="dotenv://:key_xxxxxxxxxx@dotenv.org/vault/.env.vault?environment=development" \\
+  -e ANSIBLE_HOST="52.15.153.120" \\
+  -e ANSIBLE_USER="ec2-user" \\
+  -e ANSIBLE_KEY_FILE="/app/secrets/ollama_key.pem" \\
+  -v /Users/the_user/local_key.pem:/app/secrets/ollama_key.pem:ro \\
+  ollama-atlas-rag:latest bash
+```
+
+### 2️⃣ Create an Ansible inventory file
+
+Once inside the container, create the dynamic inventory file:
+
+```bash
+echo -e "[llm_host]\\n${ANSIBLE_HOST} ansible_user=${ANSIBLE_USER} ansible_ssh_private_key_file=/app/secrets/ollama_key.pem" > /tmp/inventory.ini
+```
+
+### 3️⃣ Run the playbook
+
+Run the Ansible playbook to set up Ollama on the remote AlmaLinux host:
+
+```bash
+ansible-playbook -i /tmp/inventory.ini setup_ollama_alma.yml
+```
+
+This playbook will install required dependencies, set up Ollama, and pull the specified model defined within the playbook (`mixtral` by default).
