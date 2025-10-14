@@ -9,7 +9,7 @@ WORKDIR /app
 
 # --- 1️⃣ Install required packages (as root) ---
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends vim bash curl && \
+    apt-get install -y --no-install-recommends vim bash curl openssh-client jq && \
     rm -rf /var/lib/apt/lists/*
 
 # --- 2️⃣ Create a non-root user ---

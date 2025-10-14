@@ -234,3 +234,14 @@ ansible-playbook -i /tmp/inventory.ini setup_ollama_alma.yml
 ```
 
 This playbook will install required dependencies, set up Ollama, and pull the specified model defined within the playbook (`mixtral` by default).
+
+
+Example llm query:
+```
+$ curl -s http://${ANSIBLE_HOST}:11434/api/generate -d '{
+  "model": "mistral",
+  "prompt": "What should homeowners do in order to keep their pipes from freezing in the winter? Keep your explanation to 10 sentences or less..",
+  "stream": false
+}' | jq -r '.response'
+
+```

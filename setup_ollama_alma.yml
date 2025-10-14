@@ -1,0 +1,77 @@
+---
+- name: Setup headless LLM server on AlmaLinux
+  hosts: llm_host
+  gather_facts: false
+  become: true
+  vars:
+    ollama_model: "mistral"
+
+  tasks:
+    - name: Install prerequisites
+      ansible.builtin.dnf:
+        name:
+          - curl
+          - git
+        state: present
+
+    - name: Install Ollama
+      ansible.builtin.shell: |
+        curl -fsSL https://ollama.com/install.sh | sh
+      args:
+        creates: /usr/local/bin/ollama
+
+    - name: Enable and start Ollama service
+      ansible.builtin.systemd:
+        name: ollama
+        enabled: true
+        state: started
+
+    - name: Create systemd override directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/ollama.service.d
+        state: directory
+        mode: "0755"
+
+    - name: Add systemd override to make Ollama listen on all interfaces
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/ollama.service.d/override.conf
+        content: |
+          [Service]
+          Environment="OLLAMA_HOST=0.0.0.0"
+        mode: "0644"
+
+    - name: Reload systemd and restart Ollama
+      ansible.builtin.shell: |
+        systemctl daemon-reload
+        systemctl restart ollama
+
+    - name: Wait for Ollama API to become available
+      ansible.builtin.uri:
+        url: http://localhost:11434/api/tags
+        method: GET
+        status_code: 200
+      register: result
+      retries: 10
+      delay: 5
+      until: result.status == 200
+
+    - name: Pull the default model
+      ansible.builtin.shell: "ollama pull {{ ollama_model }}"
+
+    - name: Verify Ollama is listening externally
+      ansible.builtin.shell: "ss -tulpen | grep 11434 || true"
+      register: ss_output
+
+    - name: Display listening ports
+      ansible.builtin.debug:
+        msg: "Ollama is listening on: {{ ss_output.stdout }}"
+
+    - name: Confirm Ollama API
+      ansible.builtin.uri:
+        url: http://localhost:11434/api/tags
+        return_content: yes
+      register: verify
+
+    - name: Display available models
+      ansible.builtin.debug:
+        msg: "Ollama server is running and available models: {{ verify.json }}"
