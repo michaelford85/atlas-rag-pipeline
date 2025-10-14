@@ -141,3 +141,59 @@ docker run --rm -it   --env-file .env   --env-file .env.secrets   ollama-atlas-r
 - Create a **Vector Search Index** in MongoDB Atlas on the `fullplot_embedding` field.  
 - Use the stored vectors to perform retrieval + ranking in your Ollama RAG pipeline.  
 - Optionally set up an **Atlas Trigger** to automatically invoke embedding refresh on document insert/update events.
+
+
+---
+
+## ☁️ EC2 Instance Setup (Manual Step)
+
+Before running the Ansible playbook, create an **EC2 instance** manually in the AWS Management Console.
+
+**Recommended instance types:**  
+- `g5.xlarge` — for GPU-accelerated inference (recommended)  
+- `c7a.xlarge` — for CPU-only testing
+
+**AMI:** AlmaLinux 9 (or latest)  
+**Root Volume:** 50 GB (gp3 or gp2)  
+
+**Security Group Rules:**
+| Protocol | Port | Purpose |
+|-----------|------|----------|
+| TCP | 22 | SSH Access |
+| TCP | 80 | HTTP (for API access or testing) |
+| TCP | 11434 | Ollama API Port |
+
+After the instance is created, note the **Public IP address** — this will be referenced in your `.env` file for the Ansible playbook.
+
+Example `.env` snippet:
+```bash
+ANSIBLE_HOST=3.92.117.140
+ANSIBLE_USER=ec2-user
+ANSIBLE_KEY_FILE=/app/keys/ollama.pem
+```
+
+---
+
+## 🧩 Running the Ansible Playbook from Within the Container
+
+You can run your Ollama setup Ansible playbook directly **inside this Docker container** using the environment variables from `.env`.
+
+From your project root, run:
+
+```bash
+docker run --env-file .env -v $(pwd):/app -it atlas-rag-pipeline   ansible-playbook -i <(echo "[ollama]\n$ANSIBLE_HOST ansible_user=$ANSIBLE_USER ansible_ssh_private_key_file=$ANSIBLE_KEY_FILE") setup_ollama_alma.yml
+```
+
+This will:
+1. Load your `.env` file into the container environment.  
+2. Mount your current directory (so Ansible can find the playbook).  
+3. Dynamically build an inventory from the environment variables.  
+4. Provision the EC2 host to install and configure Ollama.
+
+If using **dotenv-vault**, you can also export the environment beforehand:
+```bash
+export $(grep -v '^#' .env | xargs)
+docker run -e ANSIBLE_HOST -e ANSIBLE_USER -e ANSIBLE_KEY_FILE -it atlas-rag-pipeline   ansible-playbook -i <(echo "[ollama]\n$ANSIBLE_HOST ansible_user=$ANSIBLE_USER ansible_ssh_private_key_file=$ANSIBLE_KEY_FILE") setup_ollama_alma.yml
+```
+
+---
