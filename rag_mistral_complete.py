@@ -95,7 +95,7 @@ Provide a concise and accurate answer (3–6 sentences).
         response = requests.post(
             f"{OLLAMA_HOST}/api/generate",
             json={"model": LLM_MODEL, "prompt": prompt, "stream": False},
-            timeout=60
+            timeout=300
         )
         response.raise_for_status()
         data = response.json()
