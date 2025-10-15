@@ -1,6 +1,6 @@
 # 🧩 Atlas RAG Pipeline — Jupyter & Colab Edition
 
-![diagram](docs/atlas_rag_pipeline.png)
+![diagram](images/atlas_rag_pipeline.png)
 
 This project demonstrates an end-to-end **Retrieval-Augmented Generation (RAG)** workflow combining:
 
@@ -31,17 +31,18 @@ The notebook walks through each major stage of the RAG workflow:
 
 ## 🧭 System Flow Diagram
 
+## 🧭 System Flow Diagram
+
 ```mermaid
 flowchart TD
-    A[🔑 Mount Google Drive / Load .env.vault] --> B[⚙️ Clone and Setup Repository]
-    B --> C[🧮 Generate VoyageAI Embeddings]
-    C --> D[🌍 MongoDB Atlas Vector Search]
-    D --> E[📄 Retrieve Similar Documents]
-    E --> F[🧱 Assemble Prompt with Context]
-    F --> G[🤖 Ollama (Mistral Model)]
-    G --> H[💬 Generated Response to User]
-    H --> I[🔄 (Optional) Restart Ollama Server]
-```
+    A[Mount Google Drive / Load .env.vault] --> B[Clone and Setup Repository]
+    B --> C[Generate VoyageAI Embeddings]
+    C --> D[MongoDB Atlas Vector Search]
+    D --> E[Retrieve Similar Documents]
+    E --> F[Assemble Prompt with Context]
+    F --> G[Ollama Mistral Model]
+    G --> H[Generated Response to User]
+    H --> I[(Optional) Restart Ollama Server]
 
 ---
 
