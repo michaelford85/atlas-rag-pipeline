@@ -7,9 +7,11 @@ from dotenv_vault import load_dotenv
 # ================================
 # 1. Load environment
 # ================================
-dotenv_path = ".env.vault"
-print(f"🔍 Loading env from {dotenv_path} ...")
-load_dotenv(dotenv_path=dotenv_path, override=True)
+dotenv_path_encrypted = ".env.vault"
+dotenv_path_local = ".env.local"
+print(f"🔍 Loading env from {dotenv_path_encrypted} and {dotenv_path_local}...")
+load_dotenv(dotenv_path=dotenv_path_encrypted, override=True)
+load_dotenv(dotenv_path=dotenv_path_local, override=True)
 
 VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY")
 MONGODB_URI = os.getenv("MONGODB_URI")
