@@ -33,7 +33,7 @@ NUM_DIMENSIONS = int(os.getenv("NUM_DIMENSIONS", "1024"))
 
 if not all([PUBLIC_KEY, PRIVATE_KEY, PROJECT_ID]):
     raise ValueError("❌ Missing one or more required environment variables: "
-                     "ATLAS_PUBLIC_KEY, ATLAS_PRIVATE_KEY, or ATLAS_PROJECT_ID")
+                     "ATLAS_PUBLIC_KEY, ATLAS_PRIVATE_KEY, or ATLAS_GROUP_ID")
 
 # ============================================================
 #  Helper: call Atlas API with Digest Auth
