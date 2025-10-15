@@ -7,10 +7,8 @@ print("🔐 Loading environment variables ...")
 
 # Try to load from .env.vault first
 dotenv_path_encrypted = ".env.vault"
-dotenv_path_local = ".env.local"
-print(f"🔍 Loading env from {dotenv_path_encrypted} and {dotenv_path_local}...")
+print(f"🔍 Loading env from {dotenv_path_encrypted}...")
 load_dotenv(dotenv_path=dotenv_path_encrypted, override=True)
-load_dotenv(dotenv_path=dotenv_path_local, override=True)
 
 # Retrieve environment variables
 MONGODB_URI = os.getenv("MONGODB_URI")
