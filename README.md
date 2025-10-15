@@ -18,41 +18,35 @@ The notebook walks through each major stage of the RAG workflow:
 |------|--------------|
 | 1️⃣ | Clone and set up the repository environment |
 | 2️⃣ | Mount Google Drive and securely load `.env.vault` keys |
-| 3️⃣ | Configure and test MongoDB Atlas + VoyageAI connections |
+| 3️⃣ | Configure and test MongoDB Atlas + VoyageAI/OpenAI connections |
 | 4️⃣ | Build or update vector embeddings and indexes |
-| 5️⃣ | Install and configure Ollama with Mistral |
+| 5️⃣ | Install and configure Ollama with specified LLM |
 | 6️⃣ | Verify model connectivity via the Ollama API |
 | 7️⃣ | Run full RAG queries combining retrieval and generation |
-| 8️⃣ | Optionally restart Ollama to refresh connections |
 
 ---
 
-## System Flow Diagram
+<!-- ## System Flow Diagram
+
+The notebook walks through each major stage of the RAG workflow:
 
 ```mermaid
 flowchart TD
-    A[Clone and Setup Repository] --> B[Mount Google Drive / Load .env.vault]
-    B --> C[Generate VoyageAI Embeddings and Vector Search Index]
-    C --> D[MongoDB Atlas Vector Search]
-    D --> E[Retrieve Similar Documents]
-    E --> F[Assemble Prompt with Context]
-    F --> G[Pass to GenAI LLM]
-    G --> H[Generate Response to User]
-```
-
-<!-- ```mermaid
-graph TD
-    A[Python ETL Script] |Inserts Documents| .-> B[(MongoDB Atlas)]
-    B .->|Stores Vectors| C[Atlas Vector Search Index]
-    C .->|Retrieval Context| D[Ollama LLM]
-    D .->|Response| E[User]
-    B .->|Change Event| F[Atlas Trigger]
-    F .->|Update Embeddings| B
-``` -->
+    A[Clone and Setup Repository] -> B[Mount Google Drive / Securely load .env.vault keys]
+    B -> C[Build or Update Vector Embeddings]
+    C -> [Ensure Vector Search Index Exists]
+    C -> D[MongoDB Atlas Vector Search]
+    D -> E[Retrieve Similar Documents]
+    E -> F[Assemble Prompt with Context]
+    F -> G[Pass to GenAI LLM]
+    G -> H[Generate Response to User]
+``` 
 
 ---
 
-## ⚙️ Prerequisites
+-->
+
+## Prerequisites
 
 1. **Install Ollama (locally or in Colab)**
    ```bash
@@ -82,7 +76,7 @@ graph TD
 
 ---
 
-## 🧩 Notebook Storyline
+## Notebook Storyline
 
 Below are the **key narrative steps** used throughout the notebook — each represented by a Markdown cell above the matching code cell.
 
