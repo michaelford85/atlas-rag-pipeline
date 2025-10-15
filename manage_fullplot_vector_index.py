@@ -7,15 +7,13 @@ from requests.auth import HTTPDigestAuth
 from dotenv_vault import load_dotenv
 
 # ============================================================
-#  Load environment from .env.vault or .env fallback
+#  Load environment variables
 # ============================================================
-
-print("🔐 Loading environment variables ...")
-vault_loaded = load_dotenv(dotenv_path=".env.vault", override=True)
-
-if not vault_loaded:
-    print("⚠️  No .env.vault loaded — falling back to .env")
-    load_dotenv(dotenv_path=".env", override=True)
+dotenv_path_encrypted = ".env.vault"
+dotenv_path_local = ".env.local"
+print(f"🔍 Loading env from {dotenv_path_encrypted} and {dotenv_path_local}...")
+load_dotenv(dotenv_path=dotenv_path_encrypted, override=True)
+load_dotenv(dotenv_path=dotenv_path_local, override=True)
 
 # ============================================================
 #  Read required environment variables
