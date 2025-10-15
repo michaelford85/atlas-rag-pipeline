@@ -31,8 +31,6 @@ The notebook walks through each major stage of the RAG workflow:
 
 ## 🧭 System Flow Diagram
 
-## 🧭 System Flow Diagram
-
 ```mermaid
 flowchart TD
     A[Mount Google Drive / Load .env.vault] --> B[Clone and Setup Repository]
@@ -43,6 +41,17 @@ flowchart TD
     F --> G[Ollama Mistral Model]
     G --> H[Generated Response to User]
     H --> I[(Optional) Restart Ollama Server]
+```
+
+<!-- ```mermaid
+graph TD
+    A[Python ETL Script] |Inserts Documents| .-> B[(MongoDB Atlas)]
+    B .->|Stores Vectors| C[Atlas Vector Search Index]
+    C .->|Retrieval Context| D[Ollama LLM]
+    D .->|Response| E[User]
+    B .->|Change Event| F[Atlas Trigger]
+    F .->|Update Embeddings| B
+``` -->
 
 ---
 
