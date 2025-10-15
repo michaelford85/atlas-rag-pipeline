@@ -31,6 +31,8 @@ The notebook walks through each major stage of the RAG workflow:
 
 ## 🧭 System Flow Diagram
 
+## 🧭 System Flow Diagram
+
 ```mermaid
 flowchart TD
     A[Mount Google Drive / Load .env.vault] --> B[Clone and Setup Repository]
@@ -40,7 +42,7 @@ flowchart TD
     E --> F[Assemble Prompt with Context]
     F --> G[Ollama Mistral Model]
     G --> H[Generated Response to User]
-    H --> I[(Optional) Restart Ollama Server]
+    H --> I[Optional: Restart Ollama Server]
 ```
 
 <!-- ```mermaid
