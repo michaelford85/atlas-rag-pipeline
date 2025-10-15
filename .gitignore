@@ -5,4 +5,5 @@
 !.env.vault
 .env.*
 .env.me
+!.env.local
 .DS_Store
