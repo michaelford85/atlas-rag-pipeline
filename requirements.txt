@@ -1,6 +1,10 @@
-# Core database & HTTP
+# Core database & dependencies
 pymongo==4.15.3
 requests>=2.30.0,<3.0.0
+tqdm
+nodejs
+npm
+ansible-core
 
 # Config / secret management
 python-dotenv>=1.0.0,<2.0.0
@@ -13,6 +17,11 @@ numpy>=1.24.0,<2.0.0
 # LLM / RAG
 langchain==0.3.26
 openai<3.0.0,>=1.104.2
+voyageai
+langchain-mongodb
+langchain-core
+langchain-openai
+langchain-voyageai
 
 # Infrastructure / automation
 ansible>=9.0.0,<10.0.0
@@ -23,3 +32,7 @@ awscli>=1.32.0,<2.0.0
 # Optional UI / logging
 colorama>=0.4.0,<1.0.0
 rich>=12.0.0,<15.0.0
+
+# Optional for better notebook outputs and debugging
+rich
+tabulate
