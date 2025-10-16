@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-Update MongoDB documents with VoyageAI embeddings for multiple fields.
-Supports both top-level and nested array-based fields (e.g., data.actv).
-No document structure changes — only new embedding fields are added.
+Generate VoyageAI embeddings for fields that may be top-level or nested within arrays.
+Adds new embedding fields without altering document structure.
 """
 
 import os
@@ -25,47 +24,47 @@ COLL_NAME = os.getenv("COLL_NAME", "user_activity")
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", 10))
 MODEL_NAME = os.getenv("MODEL_NAME", "voyage-3-large")
 
-# Comma-separated lists for multiple embeddings
+# Multiple fields
 EMBEDDING_PATHS = [p.strip() for p in os.getenv("EMBEDDING_PATHS", "").split(",") if p.strip()]
 EMBEDDING_NAMES = [n.strip() for n in os.getenv("EMBEDDING_NAMES", "").split(",") if n.strip()]
 
-# Validate configuration
+# Validate setup
 if not VOYAGE_API_KEY or not MONGODB_URI:
     raise ValueError("❌ Missing required environment variables: VOYAGE_API_KEY or MONGODB_URI")
 if len(EMBEDDING_PATHS) != len(EMBEDDING_NAMES):
-    raise ValueError("❌ EMBEDDING_PATHS and EMBEDDING_NAMES must have the same number of entries.")
+    raise ValueError("❌ EMBEDDING_PATHS and EMBEDDING_NAMES must have equal length.")
 
 # ============================================================
-# 2. Connect to MongoDB
+# 2. MongoDB connection
 # ============================================================
 client = MongoClient(MONGODB_URI)
 collection = client[DB_NAME][COLL_NAME]
 print(f"✅ Connected to MongoDB collection: {DB_NAME}.{COLL_NAME}")
 
 # ============================================================
-# 3. Helper: extract nested or array-based value
+# 3. Helper: extract nested/array values
 # ============================================================
 def extract_value(doc, path):
-    """Safely extract a nested or array-based value."""
+    """Safely traverse a document path, handling arrays if encountered."""
     parts = path.split(".")
     value = doc
     for p in parts:
         if isinstance(value, list):
-            if not value:
-                return ""
-            value = value[0]  # Take first element of array
+            # If it's a list, grab first element
+            value = value[0] if value else {}
         if not isinstance(value, dict) or p not in value:
             return ""
         value = value[p]
+    # Handle list values (like multiple comments)
     if isinstance(value, list):
         value = ", ".join(str(v) for v in value)
-    return str(value) if value else ""
+    return str(value).strip() if value else ""
 
 # ============================================================
 # 4. VoyageAI helper
 # ============================================================
 def get_embeddings(texts, retries=3, delay=2):
-    """Call VoyageAI API with retry logic."""
+    """Request embeddings from VoyageAI with retry logic."""
     url = "https://api.voyageai.com/v1/embeddings"
     headers = {
         "Authorization": f"Bearer {VOYAGE_API_KEY}",
@@ -82,7 +81,7 @@ def get_embeddings(texts, retries=3, delay=2):
         except Exception as e:
             print(f"⚠️ VoyageAI request failed (attempt {attempt + 1}/{retries}): {e}")
             time.sleep(delay)
-    raise RuntimeError("❌ Failed to fetch embeddings after multiple retries")
+    raise RuntimeError("❌ Failed to fetch embeddings after multiple retries.")
 
 # ============================================================
 # 5. Main multi-field embedding loop
@@ -90,7 +89,7 @@ def get_embeddings(texts, retries=3, delay=2):
 for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
     print(f"\n🧠 Processing embeddings for: {path} → {name}")
 
-    # Build query: use $elemMatch for nested arrays like data.actv
+    # Build query (works for top-level and nested paths)
     if "." in path:
         subfield = path.split(".", 1)[1]
         query = {"data": {"$elemMatch": {subfield: {"$exists": True}}}, name: {"$exists": False}}
@@ -100,8 +99,11 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
     total = collection.count_documents(query)
     print(f"📄 Found {total} documents missing embeddings for '{path}'")
 
-    # cursor = collection.find(query, {"_id": 1, path: 1, "data": 1})
-    cursor = collection.find(query, {"_id": 1, path: 1})
+    # Build safe projection to avoid path collisions
+    projection = {"_id": 1}
+    projection[path] = 1
+
+    cursor = collection.find(query, projection)
     batch, count = [], 0
 
     def process_batch(batch, count):
