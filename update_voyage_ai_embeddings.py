@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Generate VoyageAI embeddings for fields that may be top-level or nested within arrays.
-Adds embedding fields if missing, null, or empty — does not modify existing structure.
+Generate VoyageAI embeddings for multiple fields (top-level or nested in arrays)
+and diagnose how many documents are missing embeddings for each.
+Adds only new embedding fields — no schema or document structure changes.
 """
 
 import os
@@ -24,7 +25,7 @@ COLL_NAME = os.getenv("COLL_NAME", "user_activity")
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", 10))
 MODEL_NAME = os.getenv("MODEL_NAME", "voyage-3-large")
 
-# Multiple embedding paths and names
+# Multiple field support
 EMBEDDING_PATHS = [p.strip() for p in os.getenv("EMBEDDING_PATHS", "").split(",") if p.strip()]
 EMBEDDING_NAMES = [n.strip() for n in os.getenv("EMBEDDING_NAMES", "").split(",") if n.strip()]
 
@@ -34,14 +35,14 @@ if len(EMBEDDING_PATHS) != len(EMBEDDING_NAMES):
     raise ValueError("❌ EMBEDDING_PATHS and EMBEDDING_NAMES must have equal length.")
 
 # ============================================================
-# 2. MongoDB connection
+# 2. Connect to MongoDB
 # ============================================================
 client = MongoClient(MONGODB_URI)
 collection = client[DB_NAME][COLL_NAME]
 print(f"✅ Connected to MongoDB collection: {DB_NAME}.{COLL_NAME}")
 
 # ============================================================
-# 3. Helper: extract nested/array values
+# 3. Helper: safely extract nested or array-based values
 # ============================================================
 def extract_value(doc, path):
     """Safely traverse a document path, handling arrays if encountered."""
@@ -81,12 +82,11 @@ def get_embeddings(texts, retries=3, delay=2):
     raise RuntimeError("❌ Failed to fetch embeddings after multiple retries.")
 
 # ============================================================
-# 5. Main embedding loop
+# 5. Diagnostic check for each embedding field
 # ============================================================
-for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
-    print(f"\n🧠 Processing embeddings for: {path} → {name}")
+print("\n🔍 Running diagnostics for all embedding paths...\n")
 
-    # Build query for missing/null/empty embeddings
+for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
     if "." in path:
         subfield = path.split(".", 1)[1]
         query = {
@@ -94,7 +94,9 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
             "$or": [
                 {name: {"$exists": False}},
                 {name: None},
-                {name: {"$size": 0}}
+                {name: {"$type": "missing"}},
+                {name: {"$eq": []}},
+                {name: {"$eq": {}}}
             ]
         }
     else:
@@ -103,14 +105,52 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
             "$or": [
                 {name: {"$exists": False}},
                 {name: None},
-                {name: {"$size": 0}}
+                {name: {"$type": "missing"}},
+                {name: {"$eq": []}},
+                {name: {"$eq": {}}}
+            ]
+        }
+
+    count = collection.count_documents(query)
+    print(f"🧩 Field '{path}' → Embedding '{name}' → Missing in {count} documents")
+
+print("\n✅ Diagnostic phase complete. Starting embedding updates...\n")
+
+# ============================================================
+# 6. Main embedding loop
+# ============================================================
+for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
+    print(f"\n🧠 Processing embeddings for: {path} → {name}")
+
+    # Reuse same query structure
+    if "." in path:
+        subfield = path.split(".", 1)[1]
+        query = {
+            "data": {"$elemMatch": {subfield: {"$exists": True}}},
+            "$or": [
+                {name: {"$exists": False}},
+                {name: None},
+                {name: {"$type": "missing"}},
+                {name: {"$eq": []}},
+                {name: {"$eq": {}}}
+            ]
+        }
+    else:
+        query = {
+            path: {"$exists": True},
+            "$or": [
+                {name: {"$exists": False}},
+                {name: None},
+                {name: {"$type": "missing"}},
+                {name: {"$eq": []}},
+                {name: {"$eq": {}}}
             ]
         }
 
     total = collection.count_documents(query)
     print(f"📄 Found {total} documents missing embeddings for '{path}'")
 
-    # Safe projection (avoid "path collision at data")
+    # Safe projection
     projection = {"_id": 1}
     projection[path] = 1
     cursor = collection.find(query, projection)
