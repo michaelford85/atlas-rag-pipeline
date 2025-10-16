@@ -159,12 +159,6 @@ def ensure_vector_index(index_name: str, fields: list[str], similarity: str = "c
         print(f"⚠️ Failed to create vector index '{index_name}'. See response:")
         print(resp)
 
-    # if "id" in resp:
-    #     print(f"✅ Created vector index '{index_name}' successfully (id={resp['id']})")
-    # else:
-    #     print(f"⚠️ Failed to create vector index '{index_name}'. See response:")
-    #     print(resp)
-
 # ============================================================
 #  Main CLI entrypoint
 # ============================================================
