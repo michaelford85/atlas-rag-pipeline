@@ -17,14 +17,16 @@ DB_NAME = os.getenv("DB_NAME", "sample_mflix")
 COLL_NAME = os.getenv("COLL_NAME", "movies")
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", 10))
 MODEL_NAME = os.getenv("MODEL_NAME", "voyage-3-large")
+EMBEDDING_PATH = os.getenv("EMBEDDING_PATH")
+EMBEDDING_NAME = os.getenv("EMBEDDING_NAME")
 
 if not VOYAGE_API_KEY or not MONGODB_URI:
     raise ValueError("Missing required environment variables: VOYAGE_API_KEY or MONGODB_URI")
 
-print("✅ Environment variables successfully loaded from .env.vault!")
-print(f"VOYAGE_API_KEY starts with: {VOYAGE_API_KEY[:6]}")
-print(f"MONGODB_URI starts with: {MONGODB_URI[:20]}")
-print(f"The embedding model is  with: {MODEL_NAME}")
+# print("✅ Environment variables successfully loaded from .env.vault!")
+# print(f"VOYAGE_API_KEY starts with: {VOYAGE_API_KEY[:6]}")
+# print(f"MONGODB_URI starts with: {MONGODB_URI[:20]}")
+# print(f"The embedding model is  with: {MODEL_NAME}")
 
 # ================================
 # 2. MongoDB connection
@@ -37,10 +39,10 @@ print(f"✅ Connected to MongoDB collection: {DB_NAME}.{COLL_NAME}")
 # 3. Find docs missing embeddings
 # ================================
 cursor = collection.find(
-    {"fullplot": {"$exists": True}, "fullplot_embedding": {"$exists": False}},
-    {"_id": 1, "fullplot": 1}
+    {EMBEDDING_PATH: {"$exists": True}, EMBEDDING_NAME: {"$exists": False}},
+    {"_id": 1, EMBEDDING_PATH: 1}
 )
-total = collection.count_documents({"fullplot": {"$exists": True}, "fullplot_embedding": {"$exists": False}})
+total = collection.count_documents({EMBEDDING_PATH: {"$exists": True}, EMBEDDING_NAME: {"$exists": False}})
 print(f"📄 Found {total} documents missing embeddings")
 
 # ================================
@@ -79,7 +81,7 @@ def process_batch(batch, count):
     """Send batch to VoyageAI and update MongoDB."""
     if not batch:
         return count
-    texts = [d["fullplot"] for d in batch]
+    texts = [d[EMBEDDING_PATH] for d in batch]
     embeddings = get_embeddings(texts)
 
     ops = []
@@ -89,7 +91,7 @@ def process_batch(batch, count):
                 {"_id": doc["_id"]},
                 {
                     "$set": {
-                        "fullplot_embedding": emb,
+                        EMBEDDING_NAME: emb,
                         "embedding_model": MODEL_NAME,
                         "embedding_updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
                     }

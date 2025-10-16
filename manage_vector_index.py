@@ -21,11 +21,11 @@ PUBLIC_KEY = os.getenv("ATLAS_PUBLIC_KEY")
 PRIVATE_KEY = os.getenv("ATLAS_PRIVATE_KEY")
 PROJECT_ID = os.getenv("ATLAS_GROUP_ID")
 CLUSTER_NAME = os.getenv("ATLAS_CLUSTER")
-FULLPLOT_INDEX_NAME = os.getenv("FULLPLOT_INDEX_NAME", "fullplot_vector_index")
-DB_NAME = os.getenv("DB_NAME", "sample_mflix")
-COLL_NAME = os.getenv("COLL_NAME", "movies")
+INDEX_NAME = os.getenv("INDEX_NAME")
+DB_NAME = os.getenv("DB_NAME")
+COLL_NAME = os.getenv("COLL_NAME")
 BASE_URL = "https://cloud.mongodb.com/api/atlas/v2"
-NUM_DIMENSIONS = int(os.getenv("NUM_DIMENSIONS", "1024"))
+NUM_DIMENSIONS = int(os.getenv("NUM_DIMENSIONS"))
 
 if not all([PUBLIC_KEY, PRIVATE_KEY, PROJECT_ID]):
     raise ValueError("❌ Missing one or more required environment variables: "
@@ -150,25 +150,26 @@ def manage_vector_index():
         print("⚠️ No indexes returned — check cluster name or permissions.")
 
 # ============================================================
-# 2. Create fullplot_embedding vector index if missing
+# 2. Create embedding vector index if missing
 # ============================================================
 def ensure_fullplot_vector_index():
     indexes = list_vector_indexes()
-    existing = next((i for i in indexes if i.get("name") == FULLPLOT_INDEX_NAME), None)
+    existing = next((i for i in indexes if i.get("name") == INDEX_NAME), None)
 
     if existing:
-        print(f"✅ Vector index '{FULLPLOT_INDEX_NAME}' already exists — no action taken.")
+        print(f"✅ Vector index '{INDEX_NAME}' already exists — no action taken.")
         return
 
-    print(f"🚀 Creating vector search index '{FULLPLOT_INDEX_NAME}' on {DB_NAME}.{COLL_NAME} ...")
+    print(f"🚀 Creating vector search index '{INDEX_NAME}' on {DB_NAME}.{COLL_NAME} ...")
 
     payload = {
         "collectionName": COLL_NAME,
         "database": DB_NAME,
-        "name": FULLPLOT_INDEX_NAME,
+        "name": INDEX_NAME,
         "type": "vectorSearch",
         "fields": [
             {
+                # "path": "fullplot_embedding",
                 "path": "fullplot_embedding",
                 "type": "vector",
                 "numDimensions": NUM_DIMENSIONS,
@@ -183,9 +184,9 @@ def ensure_fullplot_vector_index():
     )
 
     if "id" in resp:
-        print(f"✅ Created vector index '{FULLPLOT_INDEX_NAME}' successfully (id={resp['id']})")
+        print(f"✅ Created vector index '{INDEX_NAME}' successfully (id={resp['id']})")
     else:
-        print(f"⚠️ Failed to create vector index '{FULLPLOT_INDEX_NAME}'. See response:")
+        print(f"⚠️ Failed to create vector index '{INDEX_NAME}'. See response:")
         print(resp)
 
 # ============================================================
