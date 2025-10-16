@@ -178,11 +178,11 @@ if __name__ == "__main__":
 
         # Determine which fields and index name to use
         index_name = args.index_name or INDEX_NAME
-        env_fields = os.getenv("EMBEDDING_FIELDS", "")
+        env_fields = os.getenv("EMBEDDING_NAMES", "")
         fields = args.fields or [f.strip() for f in env_fields.split(",") if f.strip()]
 
         if not fields:
-            raise ValueError("❌ No embedding fields provided (via --fields or EMBEDDING_FIELDS).")
+            raise ValueError("❌ No embedding fields provided (via --fields or EMBEDDING_NAMES).")
 
         ensure_vector_index(index_name, fields, similarity=args.similarity)
         print("🏁 Done.")
