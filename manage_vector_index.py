@@ -3,6 +3,7 @@ import os
 import sys
 import json
 import requests
+import argparse
 from requests.auth import HTTPDigestAuth
 from dotenv_vault import load_dotenv
 
@@ -16,31 +17,28 @@ load_dotenv(dotenv_path=dotenv_path_encrypted, override=True)
 # ============================================================
 #  Read required environment variables
 # ============================================================
-
 PUBLIC_KEY = os.getenv("ATLAS_PUBLIC_KEY")
 PRIVATE_KEY = os.getenv("ATLAS_PRIVATE_KEY")
 PROJECT_ID = os.getenv("ATLAS_GROUP_ID")
 CLUSTER_NAME = os.getenv("ATLAS_CLUSTER")
-INDEX_NAME = os.getenv("INDEX_NAME")
 DB_NAME = os.getenv("DB_NAME")
 COLL_NAME = os.getenv("COLL_NAME")
+INDEX_NAME = os.getenv("INDEX_NAME")
+NUM_DIMENSIONS = int(os.getenv("NUM_DIMENSIONS", "1536"))
 BASE_URL = "https://cloud.mongodb.com/api/atlas/v2"
-NUM_DIMENSIONS = int(os.getenv("NUM_DIMENSIONS"))
 
 if not all([PUBLIC_KEY, PRIVATE_KEY, PROJECT_ID]):
     raise ValueError("❌ Missing one or more required environment variables: "
                      "ATLAS_PUBLIC_KEY, ATLAS_PRIVATE_KEY, or ATLAS_GROUP_ID")
 
 # ============================================================
-#  Helper: call Atlas API with Digest Auth
+#  Helper: Atlas API (Digest Auth)
 # ============================================================
 
 def atlas_get(endpoint: str):
     """Perform GET request to MongoDB Atlas API with Digest Auth."""
     url = f"{BASE_URL}/{endpoint.lstrip('/')}"
-    headers = {
-        "Accept": "application/vnd.atlas.2025-03-12+json"
-    }
+    headers = {"Accept": "application/vnd.atlas.2025-03-12+json"}
 
     try:
         response = requests.get(url, auth=HTTPDigestAuth(PUBLIC_KEY, PRIVATE_KEY), headers=headers)
@@ -75,9 +73,9 @@ def atlas_post(endpoint: str, payload: dict):
             raise PermissionError("❌ Unauthorized: Check API key roles, project access, and Digest Auth.")
         else:
             raise RuntimeError(f"⚠️ POST {endpoint} failed ({response.status_code}): {response.text[:500]}")
-
     except requests.exceptions.RequestException as e:
         raise SystemExit(f"💥 Request error: {e}")
+
 # ============================================================
 #  Connectivity check
 # ============================================================
@@ -95,10 +93,10 @@ def check_connectivity():
     else:
         print("⚠️ Atlas API returned no clusters; check project ID or permissions.")
 
-
 # ============================================================
 #  List vector search indexes
 # ============================================================
+
 def list_vector_indexes():
     print(f"🔍 Checking vector search indexes for cluster: {CLUSTER_NAME}")
     endpoint = f"groups/{PROJECT_ID}/clusters/{CLUSTER_NAME}/search/indexes"
@@ -117,88 +115,74 @@ def list_vector_indexes():
     return indexes
 
 # ============================================================
-#  Vector Search Index Management
+#  Vector Search Index Management (generic for N fields)
 # ============================================================
 
-def manage_vector_index():
-    """List Atlas Vector Search indexes using the /search/indexes endpoint."""
-    if not CLUSTER_NAME:
-        print("⚠️  No ATLAS_CLUSTER_NAME defined — skipping vector index check.")
-        return
-
-    print(f"🔎 Checking vector search indexes for cluster: {CLUSTER_NAME}")
-    endpoint = f"groups/{PROJECT_ID}/clusters/{CLUSTER_NAME}/search/indexes"
-    data = atlas_get(endpoint)
-
-    # Handle both dict and list API responses
-    if isinstance(data, dict) and "results" in data:
-        indexes = data["results"]
-    elif isinstance(data, list):
-        indexes = data
-    else:
-        indexes = []
-
-    if indexes:
-        print(f"✅ Found {len(indexes)} search index(es):")
-        for idx in indexes:
-            name = idx.get("name", "Unnamed")
-            index_type = idx.get("type", "?")
-            coll = idx.get("collectionName", "?")
-            status = idx.get("status", "?")
-            print(f"   • {name} ({index_type}) on {coll} — status: {status}")
-    else:
-        print("⚠️ No indexes returned — check cluster name or permissions.")
-
-# ============================================================
-# 2. Create embedding vector index if missing
-# ============================================================
-def ensure_fullplot_vector_index():
+def ensure_vector_index(index_name: str, fields: list[str], similarity: str = "cosine"):
+    """Ensure a vector index exists with the specified fields."""
     indexes = list_vector_indexes()
-    existing = next((i for i in indexes if i.get("name") == INDEX_NAME), None)
+    existing = next((i for i in indexes if i.get("name") == index_name), None)
 
     if existing:
-        print(f"✅ Vector index '{INDEX_NAME}' already exists — no action taken.")
+        print(f"✅ Vector index '{index_name}' already exists — no action taken.")
         return
 
-    print(f"🚀 Creating vector search index '{INDEX_NAME}' on {DB_NAME}.{COLL_NAME} ...")
+    print(f"🚀 Creating vector search index '{index_name}' on {DB_NAME}.{COLL_NAME} ...")
+
+    field_definitions = [
+        {
+            "path": field,
+            "type": "vector",
+            "numDimensions": NUM_DIMENSIONS,
+            "similarity": similarity
+        }
+        for field in fields
+    ]
 
     payload = {
         "collectionName": COLL_NAME,
         "database": DB_NAME,
-        "name": INDEX_NAME,
+        "name": index_name,
         "type": "vectorSearch",
-        "fields": [
-            {
-                # "path": "fullplot_embedding",
-                "path": "fullplot_embedding",
-                "type": "vector",
-                "numDimensions": NUM_DIMENSIONS,
-                "similarity": "cosine"
-            }
-        ]
+        "fields": field_definitions
     }
 
-    resp = atlas_post(
-        f"groups/{PROJECT_ID}/clusters/{CLUSTER_NAME}/fts/indexes",
-        payload
-    )
+    resp = atlas_post(f"groups/{PROJECT_ID}/clusters/{CLUSTER_NAME}/fts/indexes", payload)
 
     if "id" in resp:
-        print(f"✅ Created vector index '{INDEX_NAME}' successfully (id={resp['id']})")
+        print(f"✅ Created vector index '{index_name}' successfully (id={resp['id']})")
     else:
-        print(f"⚠️ Failed to create vector index '{INDEX_NAME}'. See response:")
+        print(f"⚠️ Failed to create vector index '{index_name}'. See response:")
         print(resp)
 
 # ============================================================
-#  Main
+#  Main CLI entrypoint
 # ============================================================
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Manage MongoDB Atlas Vector Indexes")
+    parser.add_argument("--index-name", type=str, help="Name of the vector index")
+    parser.add_argument("--fields", nargs="+", help="List of vector embedding fields (space-separated)")
+    parser.add_argument("--similarity", type=str, choices=["cosine", "euclidean", "dotProduct"], default="cosine",
+                        help="Similarity metric (default: cosine)")
+
+    args = parser.parse_args()
+
     try:
         check_connectivity()
-        manage_vector_index()
-        ensure_fullplot_vector_index()
+        list_vector_indexes()
+
+        # Determine which fields and index name to use
+        index_name = args.index_name or INDEX_NAME
+        env_fields = os.getenv("EMBEDDING_FIELDS", "")
+        fields = args.fields or [f.strip() for f in env_fields.split(",") if f.strip()]
+
+        if not fields:
+            raise ValueError("❌ No embedding fields provided (via --fields or EMBEDDING_FIELDS).")
+
+        ensure_vector_index(index_name, fields, similarity=args.similarity)
         print("🏁 Done.")
+
     except Exception as e:
         print(f"💥 {e}")
         sys.exit(1)
