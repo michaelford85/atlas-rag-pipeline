@@ -149,11 +149,21 @@ def ensure_vector_index(index_name: str, fields: list[str], similarity: str = "c
 
     resp = atlas_post(f"groups/{PROJECT_ID}/clusters/{CLUSTER_NAME}/fts/indexes", payload)
 
-    if "id" in resp:
-        print(f"✅ Created vector index '{index_name}' successfully (id={resp['id']})")
+    if "id" in resp or "indexID" in resp:
+        print(f"✅ Created vector index '{index_name}' successfully "
+            f"(id={resp.get('id') or resp.get('indexID')}, status={resp.get('status')})")
+    elif resp.get("status") == "IN_PROGRESS":
+        print(f"⏳ Vector index '{index_name}' creation started (status=IN_PROGRESS). "
+            f"It will be READY once Atlas finishes building.")
     else:
         print(f"⚠️ Failed to create vector index '{index_name}'. See response:")
         print(resp)
+
+    # if "id" in resp:
+    #     print(f"✅ Created vector index '{index_name}' successfully (id={resp['id']})")
+    # else:
+    #     print(f"⚠️ Failed to create vector index '{index_name}'. See response:")
+    #     print(resp)
 
 # ============================================================
 #  Main CLI entrypoint
