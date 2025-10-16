@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""
+Update MongoDB documents with VoyageAI embeddings for multiple fields.
+Supports both top-level and nested array-based fields (e.g., data.actv).
+No document structure changes — only new embedding fields are added.
+"""
+
 import os
 import time
 import requests
@@ -14,52 +20,49 @@ load_dotenv(dotenv_path=dotenv_path_encrypted, override=True)
 
 VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY")
 MONGODB_URI = os.getenv("MONGODB_URI")
-DB_NAME = os.getenv("DB_NAME", "sample_mflix")
-COLL_NAME = os.getenv("COLL_NAME", "movies")
+DB_NAME = os.getenv("DB_NAME", "threatmanager")
+COLL_NAME = os.getenv("COLL_NAME", "user_activity")
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", 10))
 MODEL_NAME = os.getenv("MODEL_NAME", "voyage-3-large")
 
-# Allow multiple embedding paths/names (comma-separated)
+# Comma-separated lists for multiple embeddings
 EMBEDDING_PATHS = [p.strip() for p in os.getenv("EMBEDDING_PATHS", "").split(",") if p.strip()]
 EMBEDDING_NAMES = [n.strip() for n in os.getenv("EMBEDDING_NAMES", "").split(",") if n.strip()]
 
-# Fallback for single-field legacy env vars
-if not EMBEDDING_PATHS:
-    path = os.getenv("EMBEDDING_PATH")
-    if path:
-        EMBEDDING_PATHS = [path]
-if not EMBEDDING_NAMES:
-    name = os.getenv("EMBEDDING_NAME")
-    if name:
-        EMBEDDING_NAMES = [name]
-
+# Validate configuration
+if not VOYAGE_API_KEY or not MONGODB_URI:
+    raise ValueError("❌ Missing required environment variables: VOYAGE_API_KEY or MONGODB_URI")
 if len(EMBEDDING_PATHS) != len(EMBEDDING_NAMES):
     raise ValueError("❌ EMBEDDING_PATHS and EMBEDDING_NAMES must have the same number of entries.")
 
-if not VOYAGE_API_KEY or not MONGODB_URI:
-    raise ValueError("Missing required environment variables: VOYAGE_API_KEY or MONGODB_URI")
-
 # ============================================================
-# 2. MongoDB connection
+# 2. Connect to MongoDB
 # ============================================================
 client = MongoClient(MONGODB_URI)
 collection = client[DB_NAME][COLL_NAME]
 print(f"✅ Connected to MongoDB collection: {DB_NAME}.{COLL_NAME}")
 
+# ============================================================
+# 3. Helper: extract nested or array-based value
+# ============================================================
 def extract_value(doc, path):
+    """Safely extract a nested or array-based value."""
     parts = path.split(".")
     value = doc
     for p in parts:
         if isinstance(value, list):
-            # take first element if it's an array
-            value = value[0]
+            if not value:
+                return ""
+            value = value[0]  # Take first element of array
         if not isinstance(value, dict) or p not in value:
             return ""
         value = value[p]
-    return value if isinstance(value, str) else str(value)
+    if isinstance(value, list):
+        value = ", ".join(str(v) for v in value)
+    return str(value) if value else ""
 
 # ============================================================
-# 3. VoyageAI helper
+# 4. VoyageAI helper
 # ============================================================
 def get_embeddings(texts, retries=3, delay=2):
     """Call VoyageAI API with retry logic."""
@@ -68,10 +71,7 @@ def get_embeddings(texts, retries=3, delay=2):
         "Authorization": f"Bearer {VOYAGE_API_KEY}",
         "Content-Type": "application/json"
     }
-    payload = {
-        "model": MODEL_NAME,
-        "input": texts
-    }
+    payload = {"model": MODEL_NAME, "input": texts}
 
     for attempt in range(retries):
         try:
@@ -85,23 +85,28 @@ def get_embeddings(texts, retries=3, delay=2):
     raise RuntimeError("❌ Failed to fetch embeddings after multiple retries")
 
 # ============================================================
-# 4. Main multi-field embedding loop
+# 5. Main multi-field embedding loop
 # ============================================================
 for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
     print(f"\n🧠 Processing embeddings for: {path} → {name}")
 
-    query = {path: {"$exists": True}, name: {"$exists": False}}
-    cursor = collection.find(query, {"_id": 1, path: 1})
+    # Build query: use $elemMatch for nested arrays like data.actv
+    if "." in path:
+        subfield = path.split(".", 1)[1]
+        query = {"data": {"$elemMatch": {subfield: {"$exists": True}}}, name: {"$exists": False}}
+    else:
+        query = {path: {"$exists": True}, name: {"$exists": False}}
+
     total = collection.count_documents(query)
     print(f"📄 Found {total} documents missing embeddings for '{path}'")
 
-    batch = []
-    count = 0
+    cursor = collection.find(query, {"_id": 1, path: 1, "data": 1})
+    batch, count = [], 0
 
     def process_batch(batch, count):
         if not batch:
             return count
-        # texts = [d[path] for d in batch]
+
         texts = [extract_value(d, path) for d in batch]
         embeddings = get_embeddings(texts)
 
@@ -110,13 +115,11 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
             ops.append(
                 UpdateOne(
                     {"_id": doc["_id"]},
-                    {
-                        "$set": {
-                            name: emb,
-                            "embedding_model": MODEL_NAME,
-                            "embedding_updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-                        }
-                    }
+                    {"$set": {
+                        name: emb,
+                        "embedding_model": MODEL_NAME,
+                        "embedding_updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                    }}
                 )
             )
 
@@ -128,6 +131,7 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
             print("⚠️ Bulk write error:", bwe.details)
         except Exception as e:
             print("⚠️ Unexpected error during bulk write:", e)
+
         return count
 
     for doc in cursor:
@@ -141,4 +145,4 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
 
     print(f"✅ Embedding update complete for '{name}'.")
 
-print("🏁 All embeddings updated successfully.")
+print("\n🏁 All embeddings updated successfully.")
