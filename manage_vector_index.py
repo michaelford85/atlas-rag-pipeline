@@ -2,6 +2,7 @@
 import os
 import sys
 import json
+import time
 import requests
 import argparse
 from requests.auth import HTTPDigestAuth
@@ -98,7 +99,7 @@ def check_connectivity():
 # ============================================================
 
 def list_vector_indexes():
-    print(f"🔍 Checking vector search indexes for cluster: {CLUSTER_NAME}")
+    """Return all vector/search indexes for the given cluster."""
     endpoint = f"groups/{PROJECT_ID}/clusters/{CLUSTER_NAME}/search/indexes"
     data = atlas_get(endpoint)
 
@@ -115,7 +116,33 @@ def list_vector_indexes():
     return indexes
 
 # ============================================================
-#  Vector Search Index Management (generic for N fields)
+#  Wait for vector index to reach READY
+# ============================================================
+
+def wait_for_index_ready(index_name, poll_interval=15, timeout=900):
+    """Poll Atlas until the specified index reaches READY status."""
+    print(f"⏳ Waiting for index '{index_name}' to become READY ...")
+    start = time.time()
+
+    while time.time() - start < timeout:
+        indexes = list_vector_indexes()
+        idx = next((i for i in indexes if i.get("name") == index_name), None)
+
+        if not idx:
+            print(f"⚠️ Index '{index_name}' not found yet, retrying...")
+        else:
+            status = idx.get("status", "UNKNOWN")
+            print(f"   • Current status: {status}")
+            if status.upper() == "READY":
+                print(f"✅ Index '{index_name}' is READY!")
+                return True
+        time.sleep(poll_interval)
+
+    print(f"⌛ Timeout reached — index '{index_name}' not READY after {timeout/60:.1f} min.")
+    return False
+
+# ============================================================
+#  Vector Search Index Management
 # ============================================================
 
 def ensure_vector_index(index_name: str, fields: list[str], similarity: str = "cosine"):
@@ -124,7 +151,10 @@ def ensure_vector_index(index_name: str, fields: list[str], similarity: str = "c
     existing = next((i for i in indexes if i.get("name") == index_name), None)
 
     if existing:
-        print(f"✅ Vector index '{index_name}' already exists — no action taken.")
+        status = existing.get("status", "UNKNOWN")
+        print(f"✅ Vector index '{index_name}' already exists (status={status}).")
+        if status.upper() != "READY":
+            wait_for_index_ready(index_name)
         return
 
     print(f"🚀 Creating vector search index '{index_name}' on {DB_NAME}.{COLL_NAME} ...")
@@ -149,12 +179,9 @@ def ensure_vector_index(index_name: str, fields: list[str], similarity: str = "c
 
     resp = atlas_post(f"groups/{PROJECT_ID}/clusters/{CLUSTER_NAME}/fts/indexes", payload)
 
-    if "id" in resp or "indexID" in resp:
-        print(f"✅ Created vector index '{index_name}' successfully "
-            f"(id={resp.get('id') or resp.get('indexID')}, status={resp.get('status')})")
-    elif resp.get("status") == "IN_PROGRESS":
-        print(f"⏳ Vector index '{index_name}' creation started (status=IN_PROGRESS). "
-            f"It will be READY once Atlas finishes building.")
+    if "id" in resp or "indexID" in resp or resp.get("status") == "IN_PROGRESS":
+        print(f"✅ Index creation started (status={resp.get('status', 'IN_PROGRESS')})")
+        wait_for_index_ready(index_name)
     else:
         print(f"⚠️ Failed to create vector index '{index_name}'. See response:")
         print(resp)
@@ -169,6 +196,8 @@ if __name__ == "__main__":
     parser.add_argument("--fields", nargs="+", help="List of vector embedding fields (space-separated)")
     parser.add_argument("--similarity", type=str, choices=["cosine", "euclidean", "dotProduct"], default="cosine",
                         help="Similarity metric (default: cosine)")
+    parser.add_argument("--wait", action="store_true", help="Wait for the index to finish building before exiting")
+    parser.add_argument("--timeout", type=int, default=900, help="Maximum wait time in seconds (default 900s)")
 
     args = parser.parse_args()
 
@@ -185,6 +214,10 @@ if __name__ == "__main__":
             raise ValueError("❌ No embedding fields provided (via --fields or EMBEDDING_NAMES).")
 
         ensure_vector_index(index_name, fields, similarity=args.similarity)
+
+        if args.wait:
+            wait_for_index_ready(index_name, timeout=args.timeout)
+
         print("🏁 Done.")
 
     except Exception as e:
