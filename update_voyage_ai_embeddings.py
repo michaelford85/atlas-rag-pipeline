@@ -46,6 +46,18 @@ client = MongoClient(MONGODB_URI)
 collection = client[DB_NAME][COLL_NAME]
 print(f"✅ Connected to MongoDB collection: {DB_NAME}.{COLL_NAME}")
 
+def extract_value(doc, path):
+    parts = path.split(".")
+    value = doc
+    for p in parts:
+        if isinstance(value, list):
+            # take first element if it's an array
+            value = value[0]
+        if not isinstance(value, dict) or p not in value:
+            return ""
+        value = value[p]
+    return value if isinstance(value, str) else str(value)
+
 # ============================================================
 # 3. VoyageAI helper
 # ============================================================
@@ -89,7 +101,8 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
     def process_batch(batch, count):
         if not batch:
             return count
-        texts = [d[path] for d in batch]
+        # texts = [d[path] for d in batch]
+        texts = [extract_value(d, path) for d in batch]
         embeddings = get_embeddings(texts)
 
         ops = []
