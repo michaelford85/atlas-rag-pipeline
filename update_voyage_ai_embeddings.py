@@ -100,7 +100,8 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
     total = collection.count_documents(query)
     print(f"📄 Found {total} documents missing embeddings for '{path}'")
 
-    cursor = collection.find(query, {"_id": 1, path: 1, "data": 1})
+    # cursor = collection.find(query, {"_id": 1, path: 1, "data": 1})
+    cursor = collection.find(query, {"_id": 1, path: 1})
     batch, count = [], 0
 
     def process_batch(batch, count):
