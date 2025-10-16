@@ -94,7 +94,6 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
             "$or": [
                 {name: {"$exists": False}},
                 {name: None},
-                {name: {"$type": "missing"}},
                 {name: {"$eq": []}},
                 {name: {"$eq": {}}}
             ]
@@ -105,7 +104,6 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
             "$or": [
                 {name: {"$exists": False}},
                 {name: None},
-                {name: {"$type": "missing"}},
                 {name: {"$eq": []}},
                 {name: {"$eq": {}}}
             ]
@@ -113,6 +111,11 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
 
     count = collection.count_documents(query)
     print(f"🧩 Field '{path}' → Embedding '{name}' → Missing in {count} documents")
+
+    # Optional: print a sample document value for quick validation
+    sample = collection.find_one({path: {"$exists": True}}, {path: 1, "_id": 0})
+    if sample:
+        print(f"   ↳ Example value for '{path}': {extract_value(sample, path)}")
 
 print("\n✅ Diagnostic phase complete. Starting embedding updates...\n")
 
@@ -130,7 +133,6 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
             "$or": [
                 {name: {"$exists": False}},
                 {name: None},
-                {name: {"$type": "missing"}},
                 {name: {"$eq": []}},
                 {name: {"$eq": {}}}
             ]
@@ -141,7 +143,6 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
             "$or": [
                 {name: {"$exists": False}},
                 {name: None},
-                {name: {"$type": "missing"}},
                 {name: {"$eq": []}},
                 {name: {"$eq": {}}}
             ]
@@ -150,7 +151,6 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
     total = collection.count_documents(query)
     print(f"📄 Found {total} documents missing embeddings for '{path}'")
 
-    # Safe projection
     projection = {"_id": 1}
     projection[path] = 1
     cursor = collection.find(query, projection)
