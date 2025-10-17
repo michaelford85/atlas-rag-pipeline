@@ -171,7 +171,18 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
         if not batch:
             return count
 
-        texts = [extract_value(d, path) for d in batch]
+        # texts = [extract_value(d, path) for d in batch]
+        texts = []
+        for d in batch:
+            value = extract_value(d, path)
+            if not value or not isinstance(value, str):
+                # Skip or cast invalid entries
+                continue
+            texts.append(value.strip())
+
+        if not texts:
+            print(f"⚠️ Skipping batch — no valid text values for path '{path}'")
+            return count
         embeddings = get_embeddings(texts)
 
         ops = []
