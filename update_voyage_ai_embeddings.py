@@ -85,10 +85,11 @@ def get_embeddings(texts, retries=3, delay=2):
 # 5. Diagnostic check for each embedding field
 # ============================================================
 print("\n🧪 Running diagnostics for all embedding paths...\n")
-
+print("🔎 Connected to:", collection.full_name)
+print("📊 Document count:", collection.estimated_document_count())
 for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
-    # Determine whether this is a nested path (e.g. "data.actv")
-    if "." in path:
+    # Handle nested fields inside 'data' arrays
+    if path.startswith("data."):
         subfield = path.split(".", 1)[1]
         query = {
             "$and": [
@@ -103,8 +104,8 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
                 }
             ]
         }
-        print(query)
     else:
+        # Handle top-level fields like 'usr' or 'lib'
         query = {
             "$and": [
                 {path: {"$exists": True}},
@@ -118,8 +119,8 @@ for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
                 }
             ]
         }
-        print(query)
 
+    # print(f"🔍 Query for {path}: {query}")
     count = collection.count_documents(query)
     print(f"🧩 Path '{path}' → Embedding '{name}' → Missing in {count} documents")
 
