@@ -84,38 +84,44 @@ def get_embeddings(texts, retries=3, delay=2):
 # ============================================================
 # 5. Diagnostic check for each embedding field
 # ============================================================
-print("\n🔍 Running diagnostics for all embedding paths...\n")
+print("\n🧪 Running diagnostics for all embedding paths...\n")
 
 for path, name in zip(EMBEDDING_PATHS, EMBEDDING_NAMES):
+    # Determine whether this is a nested path (e.g. "data.actv")
     if "." in path:
         subfield = path.split(".", 1)[1]
         query = {
-            "data": {"$elemMatch": {subfield: {"$exists": True}}},
-            "$or": [
-                {name: {"$exists": False}},
-                {name: None},
-                {name: {"$eq": []}},
-                {name: {"$eq": {}}}
+            "$and": [
+                {"data": {"$elemMatch": {subfield: {"$exists": True}}}},
+                {
+                    "$or": [
+                        {name: {"$exists": False}},
+                        {name: None},
+                        {name: {"$eq": []}},
+                        {name: {"$eq": {}}}
+                    ]
+                }
             ]
         }
+        print(query)
     else:
         query = {
-            path: {"$exists": True},
-            "$or": [
-                {name: {"$exists": False}},
-                {name: None},
-                {name: {"$eq": []}},
-                {name: {"$eq": {}}}
+            "$and": [
+                {path: {"$exists": True}},
+                {
+                    "$or": [
+                        {name: {"$exists": False}},
+                        {name: None},
+                        {name: {"$eq": []}},
+                        {name: {"$eq": {}}}
+                    ]
+                }
             ]
         }
+        print(query)
 
     count = collection.count_documents(query)
-    print(f"🧩 Field '{path}' → Embedding '{name}' → Missing in {count} documents")
-
-    # Optional: print a sample document value for quick validation
-    sample = collection.find_one({path: {"$exists": True}}, {path: 1, "_id": 0})
-    if sample:
-        print(f"   ↳ Example value for '{path}': {extract_value(sample, path)}")
+    print(f"🧩 Path '{path}' → Embedding '{name}' → Missing in {count} documents")
 
 print("\n✅ Diagnostic phase complete. Starting embedding updates...\n")
 
