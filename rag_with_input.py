@@ -16,71 +16,75 @@ dotenv_path_encrypted = ".env.vault"
 print(f"🔍 Loading env from {dotenv_path_encrypted}...")
 load_dotenv(dotenv_path=dotenv_path_encrypted, override=True)
 
-# Core config
+# --- Core configuration ---
 MONGODB_URI = os.getenv("MONGODB_URI")
 VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY")
-DB_NAME = os.getenv("DB_NAME", "sample_mflix")
-COLL_NAME = os.getenv("COLL_NAME", "movies")
-INDEX_NAME = os.getenv("INDEX_NAME", "fullplot_vector_index")
+DB_NAME = os.getenv("DB_NAME")
+COLL_NAME = os.getenv("COLL_NAME")
+INDEX_NAME = os.getenv("INDEX_NAME", "usr_activity_vector_index")
 MODEL_NAME = os.getenv("MODEL_NAME", "voyage-3-large")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 LLM_MODEL = os.getenv("LLM_MODEL", "mistral")
 
-# Multi-embedding arrays
-EMBEDDING_PATHS = [p.strip() for p in os.getenv("EMBEDDING_PATHS", "").split(",") if p.strip()]
+# --- Multi-embedding arrays ---
 EMBEDDING_NAMES = [n.strip() for n in os.getenv("EMBEDDING_NAMES", "").split(",") if n.strip()]
+EMBEDDING_FIELDS = [f.strip() for f in os.getenv("EMBEDDING_FIELDS", "").split(",") if f.strip()]
 
-# # Fallback for single-field legacy vars
-# if not EMBEDDING_NAMES:
-#     EMBEDDING_NAMES = [os.getenv("VECTOR_FIELD", "fullplot_embedding")]
+# Default projection fields if EMBEDDING_FIELDS not provided
+if not EMBEDDING_FIELDS:
+    EMBEDDING_FIELDS = ["usr", "lib", "data", "timestamp"]
 
-# ============================================================
-# 2. Sanity checks
-# ============================================================
+# --- Validation ---
 missing_vars = [k for k, v in {
     "MONGODB_URI": MONGODB_URI,
     "VOYAGE_API_KEY": VOYAGE_API_KEY,
 }.items() if not v]
-
 if missing_vars:
     raise EnvironmentError(f"❌ Missing required environment variables: {missing_vars}")
 
 print(f"✅ Loaded environment for DB '{DB_NAME}', collection '{COLL_NAME}'")
-print(f"   → Using index '{INDEX_NAME}' across {len(EMBEDDING_NAMES)} embedding field(s): {', '.join(EMBEDDING_NAMES)}")
+print(f"   → Using index '{INDEX_NAME}' with {len(EMBEDDING_NAMES)} embedding fields: {', '.join(EMBEDDING_NAMES)}")
+print(f"   → Returning projection fields: {', '.join(EMBEDDING_FIELDS)}")
 
 # ============================================================
-# 3. MongoDB connection
+# 2. MongoDB connection
 # ============================================================
 client = MongoClient(MONGODB_URI, tlsCAFile=certifi.where())
 coll = client[DB_NAME][COLL_NAME]
 
 # ============================================================
-# 4. VoyageAI setup
+# 3. VoyageAI client setup
 # ============================================================
 v = voyageai.Client(api_key=VOYAGE_API_KEY)
 
 # ============================================================
-# 5. Retrieve relevant documents
+# 4. Retrieve relevant documents
 # ============================================================
-def retrieve_relevant_docs(query_text, limit=3):
+def retrieve_relevant_docs(query_text, limit=3, num_candidates=150):
     print(f"\n🔎 Generating query embedding for: {query_text}")
     query_embedding = v.embed(texts=[query_text], model=MODEL_NAME).embeddings[0]
 
     all_results = []
 
     for field in EMBEDDING_NAMES:
-        print(f"📚 Searching index '{INDEX_NAME}' on field '{field}' ...")
+        print(f"📚 Searching index '{INDEX_NAME}' on embedding field '{field}' ...")
         pipeline = [
             {
                 "$vectorSearch": {
                     "index": INDEX_NAME,
                     "path": field,
                     "queryVector": query_embedding,
-                    "numCandidates": 150,
+                    "numCandidates": num_candidates,
                     "limit": limit
                 }
             },
-            {"$project": {"title": 1, "fullplot": 1, "score": {"$meta": "vectorSearchScore"}}}
+            {
+                "$project": {
+                    "_id": 1,
+                    "score": {"$meta": "vectorSearchScore"},
+                    **{f: 1 for f in EMBEDDING_FIELDS}
+                }
+            }
         ]
 
         try:
@@ -95,7 +99,7 @@ def retrieve_relevant_docs(query_text, limit=3):
         print("⚠️  No results found across any embedding fields.")
         return []
 
-    # Sort and deduplicate results by score
+    # Sort and deduplicate by score
     all_results.sort(key=lambda x: x.get("score", 0), reverse=True)
     seen_ids = set()
     unique_results = []
@@ -108,41 +112,51 @@ def retrieve_relevant_docs(query_text, limit=3):
 
     print("\n🧠 Top Retrieved Documents:")
     for r in unique_results:
-        print(f"- {r.get('title', 'Unknown')} (score: {r.get('score'):.4f}, from: {r['_search_field']})")
+        label = r.get("usr") or r.get("lib") or r.get("data") or "Unknown"
+        print(f"- {label} (score: {r.get('score'):.4f}, from: {r['_search_field']})")
 
     return unique_results
 
 # ============================================================
-# 6. Generate answer using local Ollama model
+# 5. Generate contextual answer with Ollama
 # ============================================================
 def generate_answer(query_text, docs):
     if not docs:
         return "No relevant documents found to generate an answer."
 
-    context = "\n\n".join([
-        f"{d.get('title', 'Unknown')}:\n{d.get('fullplot', '')}" for d in docs
-    ])
+    # Flatten context from multiple fields
+    context_chunks = []
+    for d in docs:
+        for f in EMBEDDING_FIELDS:
+            if f in d:
+                val = d[f]
+                if isinstance(val, dict):
+                    val = " ".join(f"{k}: {v}" for k, v in val.items())
+                elif isinstance(val, list):
+                    val = " ".join(map(str, val))
+                context_chunks.append(f"{f}: {val}")
+
+    context = "\n".join(context_chunks[:1500])  # limit context size
     prompt = f"""
-You are a helpful assistant that answers questions based on movie plot information.
+You are a helpful assistant that answers questions based on the provided document context.
 
 Context:
 {context}
 
 Question: {query_text}
 
-Provide a concise and accurate answer (3–6 sentences).
+Provide a concise, factual answer (3–6 sentences).
 """
 
-    print("\n🧩 Sending context to local Mistral model via Ollama ...")
+    print("\n🧩 Sending context to local LLM via Ollama ...")
     try:
         response = requests.post(
             f"{OLLAMA_HOST}/api/generate",
             json={"model": LLM_MODEL, "prompt": prompt, "stream": False},
-            timeout=300
+            timeout=600
         )
         response.raise_for_status()
-        data = response.json()
-        answer = data.get("response", "").strip()
+        answer = response.json().get("response", "").strip()
         print("\n💬 Generated Answer:\n")
         print(answer)
         return answer
@@ -151,13 +165,13 @@ Provide a concise and accurate answer (3–6 sentences).
         return "Error during generation."
 
 # ============================================================
-# 7. Main entry point
+# 6. Main entry point
 # ============================================================
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         user_query = " ".join(sys.argv[1:])
     else:
-        user_query = "What movies are about an animal trying to accomplish something great?"
+        user_query = "What kind of activity was recorded most recently?"
 
     docs = retrieve_relevant_docs(user_query)
     generate_answer(user_query, docs)

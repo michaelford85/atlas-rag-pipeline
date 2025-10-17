@@ -40,9 +40,6 @@ if len(EMBEDDING_PATHS) != len(EMBEDDING_NAMES):
 client = MongoClient(MONGODB_URI)
 collection = client[DB_NAME][COLL_NAME]
 print(f"✅ Connected to MongoDB collection: {DB_NAME}.{COLL_NAME}")
-print(f"📊 Found {collection.estimated_document_count()} documents")
-if collection.estimated_document_count() == 0:
-    raise RuntimeError("❌ No documents found — check DB_NAME and COLL_NAME.")
 
 # ============================================================
 # 3. Helper: safely extract nested or array-based values
