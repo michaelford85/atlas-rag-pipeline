@@ -1,22 +1,21 @@
 # Core database & dependencies
 pymongo
-requests>=2.30.0,<3.0.0
-tqdm
+requests
 nodejs
 npm
 ansible-core
 
 # Config / secret management
-python-dotenv>=1.0.0,<2.0.0
-python-dotenv-vault==0.7.0
+python-dotenv
+python-dotenv-vault
 
 # Progress / utilities
-tqdm>=4.60.0,<5.0.0
+tqdm
 # numpy>=1.24.0,<2.0.0
 
 # LLM / RAG
-langchain==0.3.26
-openai<3.0.0,>=1.104.2
+langchain
+openai
 voyageai
 langchain-mongodb
 langchain-core
@@ -30,12 +29,9 @@ ansible-core
 # awscli>=1.32.0,<2.0.0
 
 # Pin docutils to a compatible version to avoid Sphinx warning
-docutils>=0.20,<0.22
-
-# Optional UI / logging
-colorama>=0.4.0,<1.0.0
-rich>=12.0.0,<15.0.0
+docutils
 
 # Optional: for better notebook outputs and debugging
+colorama
 rich 
 tabulate
